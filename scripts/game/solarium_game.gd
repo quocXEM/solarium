@@ -23,6 +23,10 @@ const ORB_SCENE := preload("res://scenes/orb.tscn")
 @onready var dim: ColorRect = $UI/Dim
 @onready var next_preview: Node2D = $UI/NextPreview
 @onready var aim_ghost: Node2D = $AimGhost
+@onready var hint_l: Label = $UI/Hint
+@onready var pause_panel: PanelContainer = $UI/Pause
+@onready var pause_title: Label = $UI/Pause/VBox/Title
+@onready var btn_resume: Button = $UI/Pause/VBox/Resume
 
 var _score := 0
 var _alive := true
@@ -35,49 +39,74 @@ var _new_best := false
 var _danger_t := 0.0
 var _drop_cooldown := 0.0
 var _max_seen := 0
+var _paused := false
+var _hint_done := false
 
 
 func _ready() -> void:
 	btn_retry.pressed.connect(_restart)
 	btn_menu.pressed.connect(func() -> void:
 		AudioBus.play_ui()
-		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+		SceneRouter.go("res://scenes/main_menu.tscn")
 	)
+	btn_resume.pressed.connect(_toggle_pause)
 	over.visible = false
 	dim.visible = false
+	pause_panel.visible = false
 	flash_l.modulate.a = 0.0
 	_build_vessel()
+	_spawn_dust()
 	_refresh_loc()
 	Loc.language_changed.connect(func(_c): _refresh_loc())
 	_start()
+	if not SaveData.coach_seen:
+		var coach: CanvasLayer = (load("res://scripts/ui/coach_overlay.gd") as GDScript).new()
+		add_child(coach)
 	modulate.a = 0.0
 	create_tween().tween_property(self, "modulate:a", 1.0, 0.4)
 
 
+func _spawn_dust() -> void:
+	var dust: Node2D = (load("res://scripts/fx/dust.gd") as GDScript).new()
+	add_child(dust)
+	move_child(dust, 0)
+
+
 func _refresh_loc() -> void:
 	next_l.text = Loc.tr_key("hud.next")
+	hint_l.text = Loc.tr_key("hud.hint")
 	over_title.text = Loc.tr_key("over.title")
 	btn_retry.text = Loc.tr_key("over.retry")
 	btn_menu.text = Loc.tr_key("over.menu")
+	pause_title.text = Loc.tr_key("hud.pause")
+	btn_resume.text = Loc.tr_key("hud.resume")
 	_paint_hud()
 
 
 func _build_vessel() -> void:
-	# Floor + walls as StaticBody2D
+	# Glass fill wash
+	var fill := Polygon2D.new()
+	fill.z_index = -1
+	fill.color = Color(0.55, 0.6, 0.75, 0.06)
+	fill.polygon = PackedVector2Array([
+		Vector2(VESSEL_L, VESSEL_TOP), Vector2(VESSEL_R, VESSEL_TOP),
+		Vector2(VESSEL_R, VESSEL_BOT), Vector2(VESSEL_L, VESSEL_BOT),
+	])
+	world.add_child(fill)
 	_add_wall(Vector2(540, VESSEL_BOT + 20), Vector2(760, 40))
 	_add_wall(Vector2(VESSEL_L - 20, 1100), Vector2(40, 1200))
 	_add_wall(Vector2(VESSEL_R + 20, 1100), Vector2(40, 1200))
-	# Soft glass outline (visual only)
-	var glass := Line2D.new()
-	glass.width = 3.0
-	glass.default_color = Color(0.85, 0.82, 0.9, 0.35)
-	glass.z_index = 2
-	glass.add_point(Vector2(VESSEL_L, VESSEL_TOP))
-	glass.add_point(Vector2(VESSEL_L, VESSEL_BOT))
-	glass.add_point(Vector2(VESSEL_R, VESSEL_BOT))
-	glass.add_point(Vector2(VESSEL_R, VESSEL_TOP))
-	world.add_child(glass)
-	# Danger line
+	# Double glass rim
+	for w in [5.0, 2.0]:
+		var glass := Line2D.new()
+		glass.width = w
+		glass.default_color = Color(0.88, 0.86, 0.95, 0.22 if w > 3.0 else 0.45)
+		glass.z_index = 2
+		glass.add_point(Vector2(VESSEL_L, VESSEL_TOP))
+		glass.add_point(Vector2(VESSEL_L, VESSEL_BOT))
+		glass.add_point(Vector2(VESSEL_R, VESSEL_BOT))
+		glass.add_point(Vector2(VESSEL_R, VESSEL_TOP))
+		world.add_child(glass)
 	var danger := Line2D.new()
 	danger.name = "Danger"
 	danger.width = 2.0
@@ -110,11 +139,16 @@ func _start() -> void:
 	_danger_t = 0.0
 	_drop_cooldown = 0.0
 	_max_seen = 0
+	_paused = false
+	_hint_done = false
 	_current_tier = OrbCatalog.random_drop_tier(2)
 	_next_tier = OrbCatalog.random_drop_tier(2)
 	_aim_x = 540.0
 	over.visible = false
 	dim.visible = false
+	pause_panel.visible = false
+	hint_l.visible = true
+	hint_l.modulate.a = 0.5
 	_spawn_holding()
 	_paint_hud()
 	_paint_next()
@@ -123,6 +157,20 @@ func _start() -> void:
 func _restart() -> void:
 	AudioBus.play_ui()
 	_start()
+
+
+func _toggle_pause() -> void:
+	if not _alive or over.visible:
+		return
+	_paused = not _paused
+	pause_panel.visible = _paused
+	# Soft pause: freeze physics bodies (no tree pause — keeps UI responsive)
+	for c in world.get_children():
+		if c is RigidBody2D:
+			c.freeze = _paused or (c == _holding)
+	if _holding and is_instance_valid(_holding):
+		_holding.freeze = true
+	AudioBus.play_ui()
 
 
 func _paint_hud() -> void:
@@ -186,7 +234,7 @@ func _clamp_aim(x: float) -> float:
 
 
 func _process(delta: float) -> void:
-	if not _alive:
+	if _paused or not _alive:
 		return
 	if _drop_cooldown > 0.0:
 		_drop_cooldown -= delta
@@ -194,6 +242,8 @@ func _process(delta: float) -> void:
 		_aim_x = _clamp_aim(_aim_x)
 		_holding.global_position = Vector2(_aim_x, DROP_Y)
 		aim_ghost.position = Vector2(_aim_x, DROP_Y)
+	if not _hint_done:
+		hint_l.modulate.a = 0.3 + 0.25 * absf(sin(Time.get_ticks_msec() * 0.004))
 	_check_danger(delta)
 
 
@@ -219,7 +269,10 @@ func _check_danger(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not _alive:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
+		_toggle_pause()
+		return
+	if _paused or not _alive:
 		return
 	if event is InputEventScreenTouch:
 		_aim_x = _clamp_aim(event.position.x)
@@ -236,11 +289,13 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _drop() -> void:
-	if not _alive or not _can_drop or _drop_cooldown > 0.0:
+	if not _alive or not _can_drop or _drop_cooldown > 0.0 or _paused:
 		return
 	if _holding == null or not is_instance_valid(_holding):
 		return
 	_can_drop = false
+	_hint_done = true
+	hint_l.visible = false
 	_holding.freeze = false
 	_holding.gravity_scale = 1.0
 	_holding.collision_layer = 1
@@ -253,7 +308,8 @@ func _drop() -> void:
 	aim_ghost.visible = false
 	_drop_cooldown = 0.45
 	await get_tree().create_timer(0.45).timeout
-	if not _alive:
+	if not _alive or _paused:
+		_can_drop = true
 		return
 	_current_tier = _next_tier
 	_next_tier = OrbCatalog.random_drop_tier(maxi(_max_seen, 2))

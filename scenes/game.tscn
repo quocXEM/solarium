@@ -89,6 +89,21 @@ theme_override_font_sizes/font_size = 40
 text = ""
 horizontal_alignment = 1
 
+[node name="Hint" type="Label" parent="UI"]
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -280.0
+offset_top = -200.0
+offset_right = 280.0
+offset_bottom = -160.0
+theme_override_colors/font_color = Color(0.92, 0.88, 0.86, 0.45)
+theme_override_font_sizes/font_size = 22
+text = "Drag to aim · release to drop"
+horizontal_alignment = 1
+
 [node name="Dim" type="ColorRect" parent="UI"]
 visible = false
 anchors_preset = 15
@@ -147,3 +162,32 @@ flat = true
 theme_type_variation = &"GhostButton"
 theme_override_colors/font_color = Color(0.28, 0.22, 0.26, 0.5)
 text = "Menu"
+
+[node name="Pause" type="PanelContainer" parent="UI"]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -120.0
+offset_right = 200.0
+offset_bottom = 120.0
+
+[node name="VBox" type="VBoxContainer" parent="UI/Pause"]
+layout_mode = 2
+theme_override_constants/separation = 16
+alignment = 1
+
+[node name="Title" type="Label" parent="UI/Pause/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.14, 0.11, 0.14, 1)
+theme_override_font_sizes/font_size = 36
+text = "Paused"
+horizontal_alignment = 1
+
+[node name="Resume" type="Button" parent="UI/Pause/VBox"]
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+text = "Resume"

@@ -4,7 +4,8 @@ const PATH := "user://solarium.save"
 const TIER_COUNT := 11
 
 var best: int = 0
-var discovered: Array = [] # bool per tier
+var discovered: Array = []
+var coach_seen: bool = false
 
 
 func _ready() -> void:
@@ -28,6 +29,11 @@ func discover(tier: int) -> void:
 		_save()
 
 
+func mark_coach_seen() -> void:
+	coach_seen = true
+	_save()
+
+
 func discovered_count() -> int:
 	var n := 0
 	for d in discovered:
@@ -39,7 +45,7 @@ func discovered_count() -> int:
 func _save() -> void:
 	var f := FileAccess.open(PATH, FileAccess.WRITE)
 	if f:
-		f.store_var({"best": best, "discovered": discovered})
+		f.store_var({"best": best, "discovered": discovered, "coach_seen": coach_seen})
 
 
 func _load() -> void:
@@ -51,6 +57,7 @@ func _load() -> void:
 	var data = f.get_var()
 	if data is Dictionary:
 		best = int(data.get("best", 0))
+		coach_seen = bool(data.get("coach_seen", false))
 		var d = data.get("discovered", [])
 		if d is Array:
 			for i in mini(d.size(), TIER_COUNT):
