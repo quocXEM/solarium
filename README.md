@@ -1,22 +1,33 @@
 # Solarium
 
-Drop luminous orbs into a glass vessel. Merge equals into something brighter. Overflow ends the run — one more drop.
+International physics-merge casual. Drop luminous orbs into glass. Merge equals into brighter forms. Overflow — one more drop.
 
-**Beautiful + addictive** (Suika-class loop) with a discovery album that keeps players returning.
+**Retention:** short runs · score chase · discovery album (11 tiers).
 
 ## Play
 
-Godot 4.7+ → open project → F5 → **Play**.  
-Drag to aim, release to drop.
+Godot **4.7+** → open this folder → **F5**.  
+Drag to aim · release to drop. Esc = pause.
 
-Mobile: **1080×1920** portrait.
+## Studio layout
 
-## Retention
+| Path | Role |
+|---|---|
+| `scenes/` | boot, menu, game, settings, album |
+| `scripts/core` | Loc, Save, Settings, SceneRouter |
+| `scripts/game` | Orbs, physics merge |
+| `docs/` | DESIGN · UI · MOBILE · STUDIO · PRIVACY |
+| `tools/smoke_test.gd` | Headless QA |
 
-- Short runs, rising tension at the danger line  
-- Score chase + **discovered orb album** (11 tiers)  
-- EN default / VI optional  
+## Platforms
+
+Portrait **1080×1920** · renderer mobile · Android / iOS ready.  
+See `docs/MOBILE.md`.
 
 ```bash
 Godot --path . --headless -s res://tools/smoke_test.gd
 ```
+
+## License
+
+MIT · Fonts: Cormorant Garamond (OFL) — see `LICENSE`.
